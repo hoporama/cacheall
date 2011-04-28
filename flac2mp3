@@ -1,0 +1,53 @@
+#!/usr/bin/perl
+
+$FLAC_HOME='/net/share/music/hifi';
+$MP3_DIR='/net/share/music/lowfi';
+
+### create $MP3_DIR if it doesn't exist
+mkdir("$MP3_DIR"), unless -d "$MP3_DIR";
+
+opendir(FLAC_HOME, "$FLAC_HOME");
+@ARTIST=readdir(FLAC_HOME);
+
+foreach (@ARTIST) {
+	chomp;
+	next, if (m/^\.{1,2}$/);
+	$artist=$_;
+
+	### create $artist dir in $MP3_DIR if it doesn't exist
+	mkdir("$MP3_DIR/$artist"), unless -d "$MP3_DIR/$artist";
+	
+	### open and read $album(s) in each $artist directory
+	opendir(ARTIST_DIR, "$FLAC_HOME/$artist");
+	@ALBUM=readdir(ARTIST_DIR);
+	foreach (@ALBUM) {
+		chomp;
+        	next, if (m/^\.{1,2}$/);
+        	$album=$_;
+
+		### create $album dir in $MP3_DIR if it doesn't exist
+		mkdir("$MP3_DIR/$artist/$album"), unless -d "$MP3_DIR/$artist/$album";
+
+		### open and read $title(s) in each $album directory
+        	opendir(ALBUM_DIR, "$FLAC_HOME/$artist/$album");
+        	@FLAC_FILE=grep { m/\.flac$/ && -f "$FLAC_HOME/$artist/$album/$_" } readdir(ALBUM_DIR);
+        	foreach (@FLAC_FILE) {
+                	chomp;
+                        $flac_file=$_;
+			m/(\d{2})(\W*)(.*)\.flac$/;
+			$track_num = $1;
+			$track_number = sprintf("%i", $track_num);
+			$title = $3;
+
+			### convert flac file to mp3 format if required
+			$mp3_file=sprintf("%s - %s.mp3", $track_num, $title);
+			unless (-f "$MP3_DIR/$artist/$album/$mp3_file") {
+				$command="flac -s -d \"$FLAC_HOME/$artist/$album/$flac_file\" -c | lame --quiet --preset standard --ta \"$artist\" --tl \"$album\" --tt \"$title\" --tn \"$track_number\" - \"$MP3_DIR/$artist/$album/$mp3_file\" ";
+				print("transcoding $artist - $album - $title\n");
+				print("$command\n"), if ($DEBUG);
+				system($command);
+			}	
+		}
+	}
+}
+
